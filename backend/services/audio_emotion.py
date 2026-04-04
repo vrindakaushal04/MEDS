@@ -1,4 +1,4 @@
-"""Prosody-first emotion cues from audio (librosa). Not lexical — voice timbre, pitch, energy dynamics."""
+"""Prosody-based emotions from voice: works even when pitch tracking (F0) is weak (WebM / mic)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ try:
 except ImportError:
     librosa = None  # type: ignore[assignment, misc]
 
-# Clip length cap (pyin is heavier on long files)
 _MAX_SEC = 18.0
 _HOP = 512
 _FRAME = 2048
@@ -33,6 +32,12 @@ def _sigmoid(x: float, k: float = 8.0, mid: float = 0.5) -> float:
         return 1.0 if x > mid else 0.0
 
 
+def _load_audio(path: str) -> Tuple[np.ndarray, int]:
+    assert librosa is not None
+    y, sr = librosa.load(path, sr=22050, mono=True)
+    return y, int(sr)
+
+
 def _frame_features(y: np.ndarray, sr: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     rms = librosa.feature.rms(y=y, frame_length=_FRAME, hop_length=_HOP)[0]
     zcr = librosa.feature.zero_crossing_rate(y, frame_length=_FRAME, hop_length=_HOP)[0]
@@ -42,7 +47,6 @@ def _frame_features(y: np.ndarray, sr: int) -> Tuple[np.ndarray, np.ndarray, np.
 
 
 def _f0_stats(y: np.ndarray, sr: int) -> Tuple[float, float, float]:
-    """Mean F0 (Hz), std F0 (Hz), voiced fraction — NaNs stripped."""
     fmin = librosa.note_to_hz("C2")
     fmax = librosa.note_to_hz("C7")
     f0, vf, _ = librosa.pyin(y, fmin=fmin, fmax=fmax, sr=sr, hop_length=_HOP)
@@ -53,6 +57,13 @@ def _f0_stats(y: np.ndarray, sr: int) -> Tuple[float, float, float]:
     return float(np.nanmean(fv)), float(np.nanstd(fv)), float(np.mean(voiced))
 
 
+def _f0_stats_safe(y: np.ndarray, sr: int) -> Tuple[float, float, float]:
+    try:
+        return _f0_stats(y, sr)
+    except Exception:
+        return 0.0, 0.0, 0.0
+
+
 def _onset_proxy(y: np.ndarray, sr: int) -> Tuple[float, float]:
     env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=_HOP)
     if env.size == 0:
@@ -61,96 +72,18 @@ def _onset_proxy(y: np.ndarray, sr: int) -> Tuple[float, float]:
     return float(np.mean(e)), float(np.std(e))
 
 
-def _score_emotions(feat: Dict[str, float]) -> Tuple[str, float, Dict[str, float]]:
-    """
-    Map continuous prosody features to emotion labels using competing scores.
-    Designed so flat / quiet speech is not always 'neutral' when dynamics say otherwise.
-    """
-    e = feat["energy_mean"]
-    e_std = feat["energy_jitter"]
-    z = feat["zcr_mean"]
-    z_std = feat["zcr_jitter"]
-    c = feat["brightness"]
-    r = feat["rolloff_norm"]
-    f0m = feat["f0_mean_norm"]
-    f0s = feat["f0_shake"]
-    vf = feat["voiced_frac"]
-    on_m = feat["onset_mean"]
-    on_s = feat["onset_std"]
-
-    # Voicing too weak — avoid pretending we know tone
-    if vf < 0.08 and e < 0.12:
-        return "neutral", 0.25, {}
-
-    scores: Dict[str, float] = {}
-
-    # Angry / agitated: high energy, sharp attacks, bright spectrum, often elevated ZCR
-    scores["agitated"] = (
-        0.32 * _sigmoid(e, k=10, mid=0.42)
-        + 0.22 * _sigmoid(z, k=12, mid=0.12)
-        + 0.18 * _sigmoid(c, k=10, mid=0.45)
-        + 0.18 * _sigmoid(on_m, k=10, mid=0.35)
-        + 0.10 * _sigmoid(e_std, k=12, mid=0.22)
-    )
-
-    # Anxious: shaky pitch / energy, irregular onsets, high micro-variation
-    scores["anxious"] = (
-        0.34 * _sigmoid(f0s, k=11, mid=0.18)
-        + 0.28 * _sigmoid(e_std, k=11, mid=0.20)
-        + 0.18 * _sigmoid(z_std, k=11, mid=0.08)
-        + 0.12 * _sigmoid(on_s, k=10, mid=0.12)
-        + 0.08 * _sigmoid(1.0 - e, k=8, mid=0.55)
-    )
-
-    # Sad / low mood: lower relative energy, flatter pitch contour, darker spectrum
-    scores["sad"] = (
-        0.30 * _sigmoid(1.0 - e, k=10, mid=0.52)
-        + 0.28 * _sigmoid(1.0 - f0s, k=8, mid=0.55)
-        + 0.22 * _sigmoid(1.0 - c, k=10, mid=0.48)
-        + 0.12 * _sigmoid(1.0 - f0m, k=8, mid=0.48)
-        + 0.08 * _sigmoid(1.0 - on_m, k=8, mid=0.55)
-    )
-
-    scores["low_mood"] = (
-        0.38 * _sigmoid(1.0 - e, k=9, mid=0.45)
-        + 0.28 * _sigmoid(1.0 - on_m, k=9, mid=0.50)
-        + 0.18 * _sigmoid(1.0 - c, k=8, mid=0.50)
-        + 0.16 * _sigmoid(0.25 - abs(f0s - 0.18), k=14, mid=0.0)
-    )
-
-    # Happy / animated: lively energy + pitch movement, not chaotic
-    scores["happy"] = (
-        0.28 * _sigmoid(e, k=9, mid=0.38)
-        + 0.26 * _sigmoid(f0s, k=9, mid=0.22)
-        + 0.22 * _sigmoid(c, k=8, mid=0.42)
-        + 0.14 * _sigmoid(on_m, k=9, mid=0.32)
-        + 0.10 * (1.0 - _sigmoid(e_std, k=12, mid=0.35))
-    )
-
-    # Distressed: strong negative prosody + instability (cry/shake)
-    scores["distressed"] = (
-        0.30 * _sigmoid(e_std, k=10, mid=0.24)
-        + 0.26 * _sigmoid(f0s, k=10, mid=0.24)
-        + 0.22 * _sigmoid(1.0 - e, k=8, mid=0.48)
-        + 0.22 * _sigmoid(z_std, k=10, mid=0.09)
-    )
-
-    scores["neutral"] = 0.55 * (1.0 - max(scores.values())) + 0.25 * (1.0 - vf) + 0.20 * (1.0 - on_m)
-
-    best = max(scores, key=scores.get)
-    second = sorted(scores.values(), reverse=True)
-    margin = (second[0] - second[1]) if len(second) > 1 else second[0]
-    confidence = float(max(0.35, min(0.95, 0.45 + 1.6 * margin)))
-
-    # If winner is neutral but a non-neutral score is close, break ties toward prosody
-    if best == "neutral":
-        non_neutral = {k: v for k, v in scores.items() if k != "neutral"}
-        alt, alt_s = max(non_neutral.items(), key=lambda kv: kv[1])
-        if alt_s > 0.52 and alt_s + 0.04 >= scores["neutral"]:
-            best = alt
-            confidence = float(max(0.42, min(0.88, alt_s)))
-
-    return best, confidence, scores
+def _spectral_shake_proxy(rms: np.ndarray, cent: np.ndarray) -> float:
+    """When F0 is missing, use loudness + timbre modulation as 'instability' proxy."""
+    r = rms / (float(np.max(rms)) + 1e-9)
+    r_std = float(np.std(r))
+    if cent.size > 2:
+        c = cent / (float(np.mean(cent)) + 1e-9)
+        d = np.diff(c)
+        c_std = float(np.std(np.abs(d)))
+    else:
+        c_std = 0.0
+    raw = r_std * 1.8 + c_std * 0.9
+    return float(max(0.0, min(1.0, raw * 3.2)))
 
 
 def _build_features(y: np.ndarray, sr: int) -> Dict[str, float]:
@@ -173,9 +106,15 @@ def _build_features(y: np.ndarray, sr: int) -> Dict[str, float]:
     r_hz = float(np.mean(rolloff))
     r_norm = _safe_norm(r_hz, 2000.0, 9000.0)
 
-    f0_mean_hz, f0_std_hz, vf = _f0_stats(y, sr)
-    f0_mean_norm = _safe_norm(f0_mean_hz, 95.0, 280.0) if f0_mean_hz > 0 else 0.35
-    f0_shake = _safe_norm(f0_std_hz, 5.0, 45.0)
+    f0_mean_hz, f0_std_hz, vf = _f0_stats_safe(y, sr)
+    shake_proxy = _spectral_shake_proxy(rms, cent)
+
+    f0_mean_norm = _safe_norm(f0_mean_hz, 95.0, 280.0) if f0_mean_hz > 0 else float(0.35 + 0.45 * c_norm)
+    f0_shake = _safe_norm(f0_std_hz, 5.0, 45.0) if f0_mean_hz > 0 else 0.0
+    f0_shake = float(max(f0_shake, shake_proxy * (0.88 if vf < 0.22 else 0.55)))
+
+    if vf < 0.25:
+        f0_shake = float(max(f0_shake, shake_proxy * 0.95))
 
     on_m, on_s = _onset_proxy(y, sr)
 
@@ -188,35 +127,142 @@ def _build_features(y: np.ndarray, sr: int) -> Dict[str, float]:
         "rolloff_norm": float(max(0.0, min(1.0, r_norm))),
         "f0_mean_norm": float(max(0.0, min(1.0, f0_mean_norm))),
         "f0_shake": float(max(0.0, min(1.0, f0_shake))),
-        "voiced_frac": float(max(0.0, min(1.0, vf))),
+        "voiced_frac": float(max(0.0, min(1.0, max(vf, shake_proxy * 0.35)))),
         "onset_mean": float(max(0.0, min(1.0, on_m))),
         "onset_std": float(max(0.0, min(1.0, on_s * 4.0))),
+        "shake_proxy": shake_proxy,
     }
 
 
+def _score_emotions(feat: Dict[str, float], rms_full: float) -> Tuple[str, float, Dict[str, float]]:
+    e = feat["energy_mean"]
+    e_std = feat["energy_jitter"]
+    z = feat["zcr_mean"]
+    z_std = feat["zcr_jitter"]
+    c = feat["brightness"]
+    f0m = feat["f0_mean_norm"]
+    f0s = feat["f0_shake"]
+    vf = feat["voiced_frac"]
+    on_m = feat["onset_mean"]
+    on_s = feat["onset_std"]
+
+    # True silence / near-empty clip
+    if rms_full < 0.004 and e < 0.06:
+        return "neutral", 0.3, {"neutral": 1.0}
+
+    scores: Dict[str, float] = {}
+
+    scores["agitated"] = (
+        0.32 * _sigmoid(e, k=10, mid=0.36)
+        + 0.22 * _sigmoid(z, k=12, mid=0.10)
+        + 0.18 * _sigmoid(c, k=10, mid=0.42)
+        + 0.18 * _sigmoid(on_m, k=10, mid=0.30)
+        + 0.10 * _sigmoid(e_std, k=12, mid=0.18)
+    )
+
+    scores["anxious"] = (
+        0.34 * _sigmoid(f0s, k=11, mid=0.14)
+        + 0.28 * _sigmoid(e_std, k=11, mid=0.16)
+        + 0.18 * _sigmoid(z_std, k=11, mid=0.07)
+        + 0.12 * _sigmoid(on_s, k=10, mid=0.10)
+        + 0.08 * _sigmoid(1.0 - e, k=8, mid=0.52)
+    )
+
+    scores["sad"] = (
+        0.30 * _sigmoid(1.0 - e, k=10, mid=0.48)
+        + 0.28 * _sigmoid(1.0 - f0s, k=8, mid=0.50)
+        + 0.22 * _sigmoid(1.0 - c, k=10, mid=0.45)
+        + 0.12 * _sigmoid(1.0 - f0m, k=8, mid=0.45)
+        + 0.08 * _sigmoid(1.0 - on_m, k=8, mid=0.52)
+    )
+
+    scores["low_mood"] = (
+        0.38 * _sigmoid(1.0 - e, k=9, mid=0.40)
+        + 0.28 * _sigmoid(1.0 - on_m, k=9, mid=0.46)
+        + 0.18 * _sigmoid(1.0 - c, k=8, mid=0.46)
+        + 0.16 * _sigmoid(0.22 - abs(f0s - 0.20), k=14, mid=0.0)
+    )
+
+    scores["happy"] = (
+        0.28 * _sigmoid(e, k=9, mid=0.34)
+        + 0.26 * _sigmoid(f0s, k=9, mid=0.18)
+        + 0.22 * _sigmoid(c, k=8, mid=0.38)
+        + 0.14 * _sigmoid(on_m, k=9, mid=0.28)
+        + 0.10 * (1.0 - _sigmoid(e_std, k=12, mid=0.38))
+    )
+
+    scores["distressed"] = (
+        0.30 * _sigmoid(e_std, k=10, mid=0.20)
+        + 0.26 * _sigmoid(f0s, k=10, mid=0.20)
+        + 0.22 * _sigmoid(1.0 - e, k=8, mid=0.44)
+        + 0.22 * _sigmoid(z_std, k=10, mid=0.08)
+    )
+
+    scores["angry"] = (
+        0.30 * _sigmoid(e, k=11, mid=0.40)
+        + 0.24 * _sigmoid(z, k=12, mid=0.11)
+        + 0.22 * _sigmoid(c, k=10, mid=0.46)
+        + 0.14 * _sigmoid(on_m, k=10, mid=0.34)
+        + 0.10 * _sigmoid(e_std, k=10, mid=0.24)
+    )
+
+    max_nn = max(v for k, v in scores.items())
+    scores["neutral"] = (
+        0.26 * (1.0 - max_nn)
+        + 0.12 * (1.0 - vf)
+        + 0.10 * (1.0 - on_m)
+        + 0.08 * (1.0 - e_std)
+    )
+
+    best = max(scores, key=scores.get)
+    ordered = sorted(scores.values(), reverse=True)
+    margin = (ordered[0] - ordered[1]) if len(ordered) > 1 else ordered[0]
+    confidence = float(max(0.38, min(0.94, 0.42 + 1.75 * margin)))
+
+    if best == "neutral":
+        non_neutral = {k: v for k, v in scores.items() if k != "neutral"}
+        alt, alt_s = max(non_neutral.items(), key=lambda kv: kv[1])
+        if alt_s >= 0.36 and alt_s + 0.015 >= scores["neutral"]:
+            best = alt
+            confidence = float(max(0.44, min(0.9, 0.4 + alt_s)))
+
+    return best, confidence, scores
+
+
+def _refine_label(label: str, scores: Dict[str, float], stress: float) -> str:
+    if label != "neutral" or stress < 0.4:
+        return label
+    nn = {k: v for k, v in scores.items() if k != "neutral"}
+    if not nn:
+        return label
+    alt, alt_s = max(nn.items(), key=lambda kv: kv[1])
+    if alt_s >= 0.4:
+        return alt
+    return label
+
+
 def detect(audio_bytes: bytes, filename: str = "audio.webm") -> dict:
-    if not audio_bytes:
+    if not audio_bytes or librosa is None:
         return _empty()
 
-    if librosa is None:
-        return _empty()
-
+    suffix = os.path.splitext(filename)[1] or ".webm"
     try:
-        suffix = os.path.splitext(filename)[1] or ".webm"
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
             tmp.write(audio_bytes)
             tmp.flush()
-            y, sr = librosa.load(tmp.name, sr=22050, mono=True)
+            y, sr = _load_audio(tmp.name)
 
         if y.size == 0:
-            raise ValueError("empty audio")
+            return _empty()
 
         max_samples = int(sr * _MAX_SEC)
         if y.size > max_samples:
             y = y[:max_samples]
 
+        rms_full = float(np.sqrt(np.mean(np.square(y))))
+
         feat = _build_features(y, sr)
-        label, conf, scores = _score_emotions(feat)
+        label, conf, scores = _score_emotions(feat, rms_full)
 
         arousal = float(
             0.45 * feat["energy_mean"]
@@ -238,6 +284,8 @@ def detect(audio_bytes: bytes, filename: str = "audio.webm") -> dict:
             + 0.15 * feat["zcr_mean"]
         )
 
+        label = _refine_label(label, scores, stress)
+
         intensity = "low"
         if conf >= 0.72 or stress > 0.55:
             intensity = "high"
@@ -248,7 +296,7 @@ def detect(audio_bytes: bytes, filename: str = "audio.webm") -> dict:
             ((k, v) for k, v in scores.items() if k != "neutral"),
             key=lambda kv: kv[1],
             reverse=True,
-        )[:3]
+        )[:4]
 
         return {
             "label": label,
@@ -262,7 +310,7 @@ def detect(audio_bytes: bytes, filename: str = "audio.webm") -> dict:
             "prosody_scores": {k: round(v, 3) for k, v in top_scores},
         }
     except Exception:
-        return _fallback()
+        return _empty()
 
 
 def _empty() -> dict:
@@ -277,9 +325,3 @@ def _empty() -> dict:
         "prosody_confidence": 0.0,
         "prosody_scores": {},
     }
-
-
-def _fallback() -> dict:
-    d = _empty()
-    d.update({"energy": 0.25, "pitch": 0.45, "stress_score": 0.35, "prosody_confidence": 0.2})
-    return d

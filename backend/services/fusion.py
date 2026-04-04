@@ -34,7 +34,7 @@ def _base_risk(audio: dict, text_label: str) -> float:
 
     if a_label in ("distressed", "agitated", "low_mood"):
         risk += 0.14
-    if text_label in ("sad", "anxious", "angry"):
+    if text_label in ("sad", "anxious", "angry", "emotional_mismatch", "low_mood"):
         risk += 0.12
     return max(0.0, min(1.0, risk))
 
@@ -45,7 +45,7 @@ def _voice_led_hidden_affect(text_label: str, a_label: str, audio: dict) -> bool
         return False
     pconf = float(audio.get("prosody_confidence") or 0)
     valence = float(audio.get("valence") or 0.0)
-    if pconf < 0.46:
+    if pconf < 0.42:
         return False
 
     if text_label == "neutral" and a_label in _PROSODY_STRONG:
@@ -97,15 +97,23 @@ def combine(audio_em: dict, text_em: dict) -> dict:
         mismatch = True
     if {text_label, a_label} == {"happy", "sad"} or {text_label, a_label} == {"happy", "anxious"}:
         mismatch = True
+    if text_label == "emotional_mismatch":
+        mismatch = True
 
     voice_led = _voice_led_hidden_affect(text_label, a_label, audio)
 
     if mismatch:
         final = "emotional_mismatch"
-        reason = (
-            "Words and voice cues diverge — possible emotional incongruence "
-            f"(text: {text_label}, voice: {a_label})."
-        )
+        if text_label == "emotional_mismatch":
+            reason = (
+                "Surface wording minimizes feelings, but sentiment cues suggest more underneath; "
+                f"voice read: {a_label.replace('_', ' ')}."
+            )
+        else:
+            reason = (
+                "Words and voice cues diverge — possible emotional incongruence "
+                f"(text: {text_label}, voice: {a_label})."
+            )
         combined_risk = min(1.0, _base_risk(audio, text_label) + 0.24)
     elif voice_led:
         final = a_label
