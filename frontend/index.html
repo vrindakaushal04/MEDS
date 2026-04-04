@@ -3,90 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEDS</title>
+    <title>MEDS · Multimodal Emotion Detection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,400&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <script src="https://kit.fontawesome.com/64d58efce2.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <div class="glass-bg"></div>
-    
-    <div class="container">
-        <header class="fade-in">
-            <div class="logo-area">
-                <span class="ai-icon"><i class="fas fa-brain"></i></span>
-                <h1><span>Mutimodal Emotion Detection System</span></h1>
+    <div class="ambient" aria-hidden="true"></div>
+
+    <header class="top-bar">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <div>
+                <p class="brand-eyebrow">pENTEX · Eclipse Voice Agents</p>
+                <h1 class="brand-title">MEDS</h1>
             </div>
-            <p class="subtitle">Experience empathetic intelligence. Speak or type to analyze emotional resonance.</p>
-        </header>
+        </div>
+        <div class="top-actions">
+            
+            <label class="api-label">
+                <span class="sr-only">API base URL</span>
+                <input type="url" id="apiBase" class="api-input" placeholder="http://127.0.0.1:5000" autocomplete="off">
+            </label>
+            
+        </div>
+    </header>
 
-        <main class="grid-layout">
-            <section class="card control-panel fade-in delay-1">
-                <div class="status-bar">
-                    <span id="statusIndicator" class="dot"></span>
-                    <p id="status">Status: Ready</p>
-                </div>
-                
-                <div class="action-buttons">
-                    <button id="recordBtn" class="btn-primary">
-                        <i class="fas fa-microphone"></i> <span>Start Recording</span>
-                    </button>
-                    <button id="stopBtn" class="btn-secondary" disabled>
-                        <i class="fas fa-stop"></i> Stop
-                    </button>
-                    <button id="voiceToggleBtn" class="btn-outline">
-                        <i class="fas fa-volume-up"></i> <span>Voice: On</span>
-                    </button>
+    <main class="shell">
+        <section class="hero card card-glow">
+            <h2 class="hero-title">Bridge the <em>emotion gap</em></h2>
+            
+            </p>
+        </section>
+
+        <div class="grid">
+            <section class="card panel">
+                <div class="panel-head">
+                    <h3>Input</h3>
+                    <div class="status-line">
+                        <span id="statusIndicator" class="pulse-dot" aria-hidden="true"></span>
+                        <p id="status" class="status-text">Ready</p>
+                    </div>
                 </div>
 
-                <div class="text-input-area">
-                    <textarea id="demoText" placeholder="How are you feeling today? Describe your thoughts..."></textarea>
-                    <button id="analyzeTextBtn" class="btn-accent">
-                        Analyze Perspective <i class="fas fa-arrow-right"></i>
-                    </button>
+                <div class="rec-zone">
+                    <canvas id="waveCanvas" class="wave-canvas" width="600" height="72" aria-hidden="true"></canvas>
+                    <div class="btn-row">
+                        <button type="button" id="recordBtn" class="btn btn-primary">
+                            <span class="btn-ic mic" aria-hidden="true"></span>
+                            <span>Record</span>
+                        </button>
+                        <button type="button" id="stopBtn" class="btn btn-ghost" disabled>Stop</button>
+                        <button type="button" id="voiceToggleBtn" class="btn btn-outline">
+                            <span class="btn-ic speaker" aria-hidden="true"></span>
+                            <span id="voiceLabel">Voice on</span>
+                        </button>
+                    </div>
                 </div>
+
+                <label class="field-label" for="demoText">Or type how you feel</label>
+                <textarea id="demoText" rows="4" placeholder="e.g. I keep saying I'm okay, but I'm exhausted and on edge…"></textarea>
+                <button type="button" id="analyzeTextBtn" class="btn btn-accent btn-block">
+                    Analyze text
+                </button>
             </section>
 
-            <section class="card results-panel fade-in delay-2">
-                <div class="emotion-header">
-                    <div id="emoji" class="large-emoji">✨</div>
+            <section class="card panel results">
+                <div class="panel-head">
+                    <h3>Live read</h3>
+                    <span id="loadingBadge" class="pill pill-loading hidden">Analyzing…</span>
+                </div>
+
+                <div class="emotion-hero">
+                    <div id="emoji" class="emoji" role="img" aria-label="emotion">✨</div>
                     <div>
-                        <h3>Analysis Result</h3>
-                        <p id="finalEmotion" class="highlight-text">Awaiting input...</p>
+                        <p class="muted tiny">Dominant signal</p>
+                        <p id="finalEmotion" class="emotion-label">Awaiting input</p>
+                        <div class="risk-wrap">
+                            <div class="risk-track">
+                                <div id="riskFill" class="risk-fill" style="width: 0%"></div>
+                            </div>
+                            <div class="risk-meta">
+                                <span class="muted tiny">Calmness index</span>
+                                <span id="riskScore" class="risk-num">—</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="metrics-grid">
-                    <div class="metric">
-                        <label>Risk Score</label>
-                        <span id="riskScore">--</span>
+                <div class="split-metrics">
+                    <div class="mini-metric">
+                        <span class="muted tiny">Voice layer</span>
+                        <p id="audioLayer" class="metric-val">—</p>
                     </div>
-                    <div class="metric">
-                        <label>Detected Text</label>
-                        <span id="text" class="truncate">None</span>
+                    <div class="mini-metric">
+                        <span class="muted tiny">Text layer</span>
+                        <p id="textLayer" class="metric-val">—</p>
                     </div>
                 </div>
 
                 <div class="insight-box">
-                    <label><i class="fas fa-lightbulb"></i> AI Insight</label>
-                    <p id="reason">Provide a sample to see reasoning.</p>
+                    <p class="muted tiny">Why we think this</p>
+                    <p id="reason" class="insight-body">Run an analysis to see the fusion rationale.</p>
                 </div>
 
                 <div class="response-box">
-                    <label><i class="fas fa-comment-dots"></i> Supportive Response</label>
-                    <p id="response">I'm ready to listen whenever you're ready to share.</p>
+                    <p class="muted tiny">Supportive response</p>
+                    <p id="response" class="response-body">I'm here when you're ready to share more.</p>
                 </div>
-            </section>
 
-            <section class="card chart-panel fade-in delay-3">
-                <h3><i class="fas fa-chart-line"></i> Emotional Trend</h3>
-                <div class="chart-container">
-                    <canvas id="moodChart"></canvas>
+                <div class="transcript-box">
+                    <p class="muted tiny">Transcript / input</p>
+                    <p id="text" class="transcript-body">—</p>
                 </div>
             </section>
-        </main>
-    </div>
+        </div>
+
+        <section class="card chart-card">
+            <div class="panel-head">
+                <h3>Well-being trend</h3>
+                <p class="muted tiny">Recent sessions (higher = calmer read)</p>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="moodChart"></canvas>
+            </div>
+        </section>
+    </main>
+
+ 
 
     <script src="script.js"></script>
 </body>
