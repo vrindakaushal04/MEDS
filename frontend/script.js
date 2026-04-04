@@ -1,4 +1,6 @@
-const LS_API = "meds_api_base";
+const LS_API       = "meds_api_base";
+const LS_HISTORY   = "meds_mood_history";   // persisted 7-day log
+const HISTORY_DAYS = 7;                      // keep last N days
 
 const emotionEmojiMap = {
     high_distress: "🆘",
@@ -16,14 +18,70 @@ const emotionEmojiMap = {
 let mediaRecorder;
 let audioChunks = [];
 let voiceEnabled = true;
-let recordingCount = 0;
 let moodChart;
-const moodLabels = [];
-const moodScores = [];
 let audioCtx;
 let analyser;
 let waveRaf;
 let mediaStream;
+
+// ── Persistent 7-day history ─────────────────────────────────────────────────
+function loadHistory() {
+    try {
+        const raw = localStorage.getItem(LS_HISTORY);
+        const all = raw ? JSON.parse(raw) : [];
+        const cutoff = Date.now() - HISTORY_DAYS * 24 * 60 * 60 * 1000;
+        return all.filter(p => p.ts >= cutoff);
+    } catch { return []; }
+}
+
+function saveHistory(points) {
+    try {
+        localStorage.setItem(LS_HISTORY, JSON.stringify(points));
+    } catch {}
+}
+
+function addHistoryPoint(emotion, score) {
+    const points = loadHistory();
+    points.push({ ts: Date.now(), emotion, score });
+    saveHistory(points);
+    return points;
+}
+
+function clearHistory() {
+    localStorage.removeItem(LS_HISTORY);
+    rebuildChart([]);
+}
+
+function formatLabel(ts) {
+    const d = new Date(ts);
+    const days  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const hh    = String(d.getHours()).padStart(2, "0");
+    const mm    = String(d.getMinutes()).padStart(2, "0");
+    return `${days[d.getDay()]} ${hh}:${mm}`;
+}
+
+function rebuildChart(points) {
+    if (!moodChart) return;
+    moodChart.data.labels   = points.map(p => formatLabel(p.ts));
+    moodChart.data.datasets[0].data = points.map(p => p.score);
+    // Colour each point by emotion
+    moodChart.data.datasets[0].pointBackgroundColor = points.map(p => emotionColor(p.emotion));
+    moodChart.update();
+}
+
+const EMOTION_COLORS = {
+    happy:              "#34d399",
+    neutral:            "#5eead4",
+    low_mood:           "#fbbf24",
+    anxious:            "#f97316",
+    sad:                "#818cf8",
+    angry:              "#f87171",
+    agitated:           "#fb923c",
+    emotional_mismatch: "#a78bfa",
+    distressed:         "#ef4444",
+    high_distress:      "#dc2626",
+};
+function emotionColor(e) { return EMOTION_COLORS[e] || "#5eead4"; }
 
 const statusText = document.getElementById("status");
 const statusDot = document.getElementById("statusIndicator");
@@ -138,21 +196,25 @@ async function pingBackend() {
 function initMoodChart() {
     const ctx = document.getElementById("moodChart").getContext("2d");
     const gradient = ctx.createLinearGradient(0, 0, 0, 260);
-    gradient.addColorStop(0, "rgba(94, 234, 212, 0.35)");
+    gradient.addColorStop(0, "rgba(94, 234, 212, 0.25)");
     gradient.addColorStop(1, "rgba(94, 234, 212, 0)");
+
+    const history = loadHistory();
 
     moodChart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: moodLabels,
+            labels:   history.map(p => formatLabel(p.ts)),
             datasets: [
                 {
-                    label: "Calmness",
-                    data: moodScores,
+                    label: "Wellness Score",
+                    data:  history.map(p => p.score),
                     borderColor: "#5eead4",
                     borderWidth: 2.5,
-                    pointRadius: 3,
-                    tension: 0.35,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: history.map(p => emotionColor(p.emotion)),
+                    tension: 0.38,
                     fill: true,
                     backgroundColor: gradient,
                 },
@@ -161,7 +223,27 @@ function initMoodChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => items[0].label,
+                        label: (item) => {
+                            const pts = loadHistory();
+                            const pt  = pts[item.dataIndex];
+                            const em  = pt ? humanizeEmotion(pt.emotion) : "";
+                            return ` Score: ${item.raw}  |  ${em}`;
+                        },
+                    },
+                    backgroundColor: "rgba(15,23,42,0.92)",
+                    titleColor: "#94a3b8",
+                    bodyColor: "#e2e8f0",
+                    borderColor: "rgba(94,234,212,0.3)",
+                    borderWidth: 1,
+                    padding: 10,
+                },
+            },
             scales: {
                 y: {
                     min: 0,
@@ -171,7 +253,7 @@ function initMoodChart() {
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { color: "#94a3b8", maxRotation: 0 },
+                    ticks: { color: "#94a3b8", maxRotation: 30, font: { size: 11 } },
                 },
             },
         },
@@ -181,30 +263,34 @@ function initMoodChart() {
 function riskToCalmness(finalEmotion, combinedRisk) {
     const numericRisk = Number(combinedRisk);
     const risk = Number.isFinite(numericRisk) ? numericRisk : 0;
-    let score = Math.round((1 - risk) * 100);
-    const penalties = {
-        high_distress: 18,
-        distressed: 12,
-        agitated: 8,
-        low_mood: 6,
-        emotional_mismatch: 5,
-        sad: 4,
-        anxious: 4,
-        angry: 5,
+
+    // Curved scale: maps risk 0→85, 0.5→55, 1.0→20
+    // This keeps scores mid-range (20–85) regardless of raw risk value
+    let score = Math.round(85 - risk * 65);
+
+    // Emotion modifiers — small nudges to reflect emotional state
+    const modifiers = {
+        happy:              +8,
+        neutral:            +5,
+        low_mood:           -5,
+        anxious:            -6,
+        sad:                -7,
+        angry:              -8,
+        agitated:           -9,
+        emotional_mismatch: -6,
+        distressed:         -12,
+        high_distress:      -18,
     };
-    score -= penalties[finalEmotion] || 0;
-    return Math.max(0, Math.min(100, score));
+    score += modifiers[finalEmotion] || 0;
+
+    // Floor at 12, ceiling at 92 — never show extreme numbers
+    return Math.max(12, Math.min(92, score));
 }
 
 function pushMoodPoint(finalEmotion, combinedRisk) {
-    recordingCount += 1;
-    moodLabels.push(`#${recordingCount}`);
-    moodScores.push(riskToCalmness(finalEmotion, combinedRisk));
-    if (moodLabels.length > 12) {
-        moodLabels.shift();
-        moodScores.shift();
-    }
-    moodChart.update();
+    const score = riskToCalmness(finalEmotion, combinedRisk);
+    const points = addHistoryPoint(finalEmotion, score);
+    rebuildChart(points);
 }
 
 function speakResponse(text) {

@@ -86,7 +86,7 @@
                                 <div id="riskFill" class="risk-fill" style="width: 0%"></div>
                             </div>
                             <div class="risk-meta">
-                                <span class="muted tiny">Calmness index</span>
+                                <span class="muted tiny">Wellness Score</span>
                                 <span id="riskScore" class="risk-num">—</span>
                             </div>
                         </div>
@@ -123,8 +123,11 @@
 
         <section class="card chart-card">
             <div class="panel-head">
-                <h3>Well-being trend</h3>
-                <p class="muted tiny">Recent sessions (higher = calmer read)</p>
+                <h3>Well-being trend <span class="pill pill-dim">7-day history</span></h3>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <p class="muted tiny">Saved across sessions · colour = emotion</p>
+                    <button type="button" id="clearHistoryBtn" class="btn btn-ghost btn-xs" onclick="clearHistory()">Clear</button>
+                </div>
             </div>
             <div class="chart-wrap">
                 <canvas id="moodChart"></canvas>
