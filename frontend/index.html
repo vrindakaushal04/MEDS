@@ -1,1 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion AI | Intelligent Sentiment Analysis</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/64d58efce2.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="glass-bg"></div>
+    
+    <div class="container">
+        <header class="fade-in">
+            <div class="logo-area">
+                <span class="ai-icon"><i class="fas fa-brain"></i></span>
+                <h1>Emotion <span>AI</span></h1>
+            </div>
+            <p class="subtitle">Experience empathetic intelligence. Speak or type to analyze emotional resonance.</p>
+        </header>
 
+        <main class="grid-layout">
+            <section class="card control-panel fade-in delay-1">
+                <div class="status-bar">
+                    <span id="statusIndicator" class="dot"></span>
+                    <p id="status">Status: Ready</p>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="recordBtn" class="btn-primary">
+                        <i class="fas fa-microphone"></i> <span>Start Recording</span>
+                    </button>
+                    <button id="stopBtn" class="btn-secondary" disabled>
+                        <i class="fas fa-stop"></i> Stop
+                    </button>
+                    <button id="voiceToggleBtn" class="btn-outline">
+                        <i class="fas fa-volume-up"></i> <span>Voice: On</span>
+                    </button>
+                </div>
+
+                <div class="text-input-area">
+                    <textarea id="demoText" placeholder="How are you feeling today? Describe your thoughts..."></textarea>
+                    <button id="analyzeTextBtn" class="btn-accent">
+                        Analyze Perspective <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </section>
+
+            <section class="card results-panel fade-in delay-2">
+                <div class="emotion-header">
+                    <div id="emoji" class="large-emoji">✨</div>
+                    <div>
+                        <h3>Analysis Result</h3>
+                        <p id="finalEmotion" class="highlight-text">Awaiting input...</p>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <label>Risk Score</label>
+                        <span id="riskScore">--</span>
+                    </div>
+                    <div class="metric">
+                        <label>Detected Text</label>
+                        <span id="text" class="truncate">None</span>
+                    </div>
+                </div>
+
+                <div class="insight-box">
+                    <label><i class="fas fa-lightbulb"></i> AI Insight</label>
+                    <p id="reason">Provide a sample to see reasoning.</p>
+                </div>
+
+                <div class="response-box">
+                    <label><i class="fas fa-comment-dots"></i> Supportive Response</label>
+                    <p id="response">I'm ready to listen whenever you're ready to share.</p>
+                </div>
+            </section>
+
+            <section class="card chart-panel fade-in delay-3">
+                <h3><i class="fas fa-chart-line"></i> Emotional Trend</h3>
+                <div class="chart-container">
+                    <canvas id="moodChart"></canvas>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
