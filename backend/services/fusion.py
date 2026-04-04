@@ -34,7 +34,7 @@ def _base_risk(audio: dict, text_label: str) -> float:
 
     if a_label in ("distressed", "agitated", "low_mood"):
         risk += 0.14
-    if text_label in ("sad", "anxious", "angry", "emotional_mismatch", "low_mood"):
+    if text_label in ("sad", "anxious", "angry", "emotional_mismatch", "low_mood", "distressed"):
         risk += 0.12
     return max(0.0, min(1.0, risk))
 
@@ -45,22 +45,24 @@ def _voice_led_hidden_affect(text_label: str, a_label: str, audio: dict) -> bool
         return False
     pconf = float(audio.get("prosody_confidence") or 0)
     valence = float(audio.get("valence") or 0.0)
-    if pconf < 0.42:
+    # Lowered threshold from 0.42 → 0.35, real mic speech may have slightly lower confidence
+    if pconf < 0.35:
         return False
 
     if text_label == "neutral" and a_label in _PROSODY_STRONG:
         return True
 
     if text_label == "happy" and a_label in ("sad", "anxious", "distressed", "low_mood"):
-        return pconf >= 0.42
+        return pconf >= 0.35
 
     if text_label == "happy" and a_label in ("agitated", "angry"):
-        return pconf >= 0.52
+        return pconf >= 0.45
 
     if text_label == "happy" and valence < -0.2 and a_label not in ("happy", "neutral"):
-        return pconf >= 0.48
+        return pconf >= 0.40
 
     return False
+
 
 
 def _hidden_reason(a_label: str, audio: dict) -> str:

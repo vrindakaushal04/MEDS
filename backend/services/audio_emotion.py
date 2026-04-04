@@ -147,84 +147,88 @@ def _score_emotions(feat: Dict[str, float], rms_full: float) -> Tuple[str, float
     on_s = feat["onset_std"]
 
     # True silence / near-empty clip
-    if rms_full < 0.004 and e < 0.06:
+    if rms_full < 0.003 and e < 0.04:
         return "neutral", 0.3, {"neutral": 1.0}
 
     scores: Dict[str, float] = {}
 
+    # Lowered midpoints so real mic speech (often quieter/shorter) triggers emotions
     scores["agitated"] = (
-        0.32 * _sigmoid(e, k=10, mid=0.36)
-        + 0.22 * _sigmoid(z, k=12, mid=0.10)
-        + 0.18 * _sigmoid(c, k=10, mid=0.42)
-        + 0.18 * _sigmoid(on_m, k=10, mid=0.30)
-        + 0.10 * _sigmoid(e_std, k=12, mid=0.18)
+        0.32 * _sigmoid(e, k=10, mid=0.26)
+        + 0.22 * _sigmoid(z, k=12, mid=0.08)
+        + 0.18 * _sigmoid(c, k=10, mid=0.35)
+        + 0.18 * _sigmoid(on_m, k=10, mid=0.22)
+        + 0.10 * _sigmoid(e_std, k=12, mid=0.14)
     )
 
     scores["anxious"] = (
-        0.34 * _sigmoid(f0s, k=11, mid=0.14)
-        + 0.28 * _sigmoid(e_std, k=11, mid=0.16)
-        + 0.18 * _sigmoid(z_std, k=11, mid=0.07)
-        + 0.12 * _sigmoid(on_s, k=10, mid=0.10)
-        + 0.08 * _sigmoid(1.0 - e, k=8, mid=0.52)
+        0.34 * _sigmoid(f0s, k=11, mid=0.10)
+        + 0.28 * _sigmoid(e_std, k=11, mid=0.12)
+        + 0.18 * _sigmoid(z_std, k=11, mid=0.05)
+        + 0.12 * _sigmoid(on_s, k=10, mid=0.08)
+        + 0.08 * _sigmoid(1.0 - e, k=8, mid=0.45)
     )
 
     scores["sad"] = (
-        0.30 * _sigmoid(1.0 - e, k=10, mid=0.48)
-        + 0.28 * _sigmoid(1.0 - f0s, k=8, mid=0.50)
-        + 0.22 * _sigmoid(1.0 - c, k=10, mid=0.45)
-        + 0.12 * _sigmoid(1.0 - f0m, k=8, mid=0.45)
-        + 0.08 * _sigmoid(1.0 - on_m, k=8, mid=0.52)
+        0.30 * _sigmoid(1.0 - e, k=10, mid=0.38)
+        + 0.28 * _sigmoid(1.0 - f0s, k=8, mid=0.42)
+        + 0.22 * _sigmoid(1.0 - c, k=10, mid=0.38)
+        + 0.12 * _sigmoid(1.0 - f0m, k=8, mid=0.38)
+        + 0.08 * _sigmoid(1.0 - on_m, k=8, mid=0.45)
     )
 
     scores["low_mood"] = (
-        0.38 * _sigmoid(1.0 - e, k=9, mid=0.40)
-        + 0.28 * _sigmoid(1.0 - on_m, k=9, mid=0.46)
-        + 0.18 * _sigmoid(1.0 - c, k=8, mid=0.46)
+        0.38 * _sigmoid(1.0 - e, k=9, mid=0.32)
+        + 0.28 * _sigmoid(1.0 - on_m, k=9, mid=0.38)
+        + 0.18 * _sigmoid(1.0 - c, k=8, mid=0.38)
         + 0.16 * _sigmoid(0.22 - abs(f0s - 0.20), k=14, mid=0.0)
     )
 
     scores["happy"] = (
-        0.28 * _sigmoid(e, k=9, mid=0.34)
-        + 0.26 * _sigmoid(f0s, k=9, mid=0.18)
-        + 0.22 * _sigmoid(c, k=8, mid=0.38)
-        + 0.14 * _sigmoid(on_m, k=9, mid=0.28)
-        + 0.10 * (1.0 - _sigmoid(e_std, k=12, mid=0.38))
+        0.28 * _sigmoid(e, k=9, mid=0.26)
+        + 0.26 * _sigmoid(f0s, k=9, mid=0.14)
+        + 0.22 * _sigmoid(c, k=8, mid=0.30)
+        + 0.14 * _sigmoid(on_m, k=9, mid=0.22)
+        + 0.10 * (1.0 - _sigmoid(e_std, k=12, mid=0.32))
     )
 
     scores["distressed"] = (
-        0.30 * _sigmoid(e_std, k=10, mid=0.20)
-        + 0.26 * _sigmoid(f0s, k=10, mid=0.20)
-        + 0.22 * _sigmoid(1.0 - e, k=8, mid=0.44)
-        + 0.22 * _sigmoid(z_std, k=10, mid=0.08)
+        0.30 * _sigmoid(e_std, k=10, mid=0.15)
+        + 0.26 * _sigmoid(f0s, k=10, mid=0.15)
+        + 0.22 * _sigmoid(1.0 - e, k=8, mid=0.38)
+        + 0.22 * _sigmoid(z_std, k=10, mid=0.06)
     )
 
     scores["angry"] = (
-        0.30 * _sigmoid(e, k=11, mid=0.40)
-        + 0.24 * _sigmoid(z, k=12, mid=0.11)
-        + 0.22 * _sigmoid(c, k=10, mid=0.46)
-        + 0.14 * _sigmoid(on_m, k=10, mid=0.34)
-        + 0.10 * _sigmoid(e_std, k=10, mid=0.24)
+        0.30 * _sigmoid(e, k=11, mid=0.30)
+        + 0.24 * _sigmoid(z, k=12, mid=0.09)
+        + 0.22 * _sigmoid(c, k=10, mid=0.38)
+        + 0.14 * _sigmoid(on_m, k=10, mid=0.26)
+        + 0.10 * _sigmoid(e_std, k=10, mid=0.18)
     )
 
     max_nn = max(v for k, v in scores.items())
+    # Make neutral harder to win — reduce its weight significantly
     scores["neutral"] = (
-        0.26 * (1.0 - max_nn)
-        + 0.12 * (1.0 - vf)
-        + 0.10 * (1.0 - on_m)
-        + 0.08 * (1.0 - e_std)
+        0.18 * (1.0 - max_nn)
+        + 0.08 * (1.0 - vf)
+        + 0.07 * (1.0 - on_m)
+        + 0.05 * (1.0 - e_std)
     )
 
     best = max(scores, key=scores.get)
     ordered = sorted(scores.values(), reverse=True)
     margin = (ordered[0] - ordered[1]) if len(ordered) > 1 else ordered[0]
-    confidence = float(max(0.38, min(0.94, 0.42 + 1.75 * margin)))
+    confidence = float(max(0.40, min(0.95, 0.45 + 1.8 * margin)))
 
+    # Anti-neutral override: if any emotion is reasonably strong, prefer it
     if best == "neutral":
         non_neutral = {k: v for k, v in scores.items() if k != "neutral"}
         alt, alt_s = max(non_neutral.items(), key=lambda kv: kv[1])
-        if alt_s >= 0.36 and alt_s + 0.015 >= scores["neutral"]:
+        # Lowered threshold from 0.36 to 0.22 — real speech should trigger this
+        if alt_s >= 0.22:
             best = alt
-            confidence = float(max(0.44, min(0.9, 0.4 + alt_s)))
+            confidence = float(max(0.44, min(0.92, 0.42 + alt_s)))
 
     return best, confidence, scores
 
@@ -246,11 +250,13 @@ def detect(audio_bytes: bytes, filename: str = "audio.webm") -> dict:
         return _empty()
 
     suffix = os.path.splitext(filename)[1] or ".webm"
+    tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        # Windows fix: delete=False so librosa can open the file after we close it
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(audio_bytes)
-            tmp.flush()
-            y, sr = _load_audio(tmp.name)
+            tmp_path = tmp.name
+        y, sr = _load_audio(tmp_path)
 
         if y.size == 0:
             return _empty()
@@ -309,8 +315,17 @@ def detect(audio_bytes: bytes, filename: str = "audio.webm") -> dict:
             "prosody_confidence": round(conf, 3),
             "prosody_scores": {k: round(v, 3) for k, v in top_scores},
         }
-    except Exception:
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()  # Print to console so we can see what's failing
         return _empty()
+    finally:
+        # Clean up temp file
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
 
 def _empty() -> dict:

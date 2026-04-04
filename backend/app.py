@@ -45,17 +45,22 @@ def safe_pipeline(text, audio_emotion_input=None):
 
         try:
             text_em = text_emotion.detect(text)
-        except Exception:
+        except Exception as e:
+            print(f"[text_emotion ERROR] {e}")
+            import traceback; traceback.print_exc()
             text_em = {"label": "neutral"}
 
         try:
             fused = fusion.combine(audio_em, text_em)
-        except Exception:
+        except Exception as e:
+            print(f"[fusion ERROR] {e}")
+            import traceback; traceback.print_exc()
             fused = {"final_emotion": "neutral"}
 
         try:
             reply = response.generate(text, fused)
-        except Exception:
+        except Exception as e:
+            print(f"[response ERROR] {e}")
             reply = "I'm here to help."
 
         return {
@@ -68,12 +73,15 @@ def safe_pipeline(text, audio_emotion_input=None):
             "response": reply,
         }
 
-    except Exception:
+    except Exception as e:
+        print(f"[pipeline ERROR] {e}")
+        import traceback; traceback.print_exc()
         return {
             "success": False,
             "error": "Pipeline failed",
             "final_emotion": "neutral"
         }
+
 
 
 @app.route("/analyze", methods=["POST"])
