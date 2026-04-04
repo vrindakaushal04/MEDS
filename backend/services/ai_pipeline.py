@@ -23,7 +23,7 @@ class EmotionPipeline:
         """
 
     def transcribe_audio(self, audio_file_path):
-        """The EARS: Turns the user's voice file into text."""
+        
         print(f"[STT] Transcribing audio file: {audio_file_path}")
         try:
             with open(audio_file_path, "rb") as audio_file:
@@ -37,7 +37,7 @@ class EmotionPipeline:
             return "Error transcribing audio."
 
     def analyze_text(self, transcribed_text):
-        """The BRAIN: Analyzes emotion and writes a reply."""
+       
         print(f"[SLM] Analyzing text: '{transcribed_text}'")
         try:
             response = self.client.chat.completions.create(
@@ -58,13 +58,13 @@ class EmotionPipeline:
             return "Error", "Connection failed."
 
     def generate_audio(self, reply_text):
-        """The MOUTH: Turns the AI's reply back into a voice file."""
+       
         print(f"[TTS] Generating voice for: '{reply_text}'")
         output_file = "response_audio.mp3"
         try:
             response = self.client.audio.speech.create(
                 model="tts-1",
-                voice="nova", # A very calm, empathetic female voice
+                voice="nova", 
                 input=reply_text
             )
             response.stream_to_file(output_file)
@@ -74,14 +74,13 @@ class EmotionPipeline:
             return None
 
     def process_full_interaction(self, audio_file_path):
-        """THE MASTER LOOP: Called by your Brother's server."""
-        # 1. Listen
+       
         user_text = self.transcribe_audio(audio_file_path)
         
-        # 2. Think
+       
         emotion, reply_text = self.analyze_text(user_text)
         
-        # 3. Speak
+       
         audio_response_path = self.generate_audio(reply_text)
         
         return {

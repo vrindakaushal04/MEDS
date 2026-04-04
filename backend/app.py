@@ -20,7 +20,7 @@ def root():
     })
 
 
-# Safe pipeline (never crash)
+
 def safe_pipeline(text, audio_emotion_input=None):
     try:
         audio_em = audio_emotion_input or {
