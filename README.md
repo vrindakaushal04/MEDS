@@ -1,17 +1,21 @@
 # MEDS
-Multimodal Emotion Detection System -- Voice based Emotion detection model
+Multimodal Emotion Detection System - Voice based Emotion detection model
 Bridging the "Emotion Gap" between spoken words and true feelings.
 
 Developed by Team pENTEX for the Eclipse 6.0 SLM Voice Agents Challenge
 
 ## The Problem
-Most AI systems rely almost exclusively on text, meaning they often miss the real human condition. This leads to an "Emotion Gap" where distress or hidden frustration remains unnoticed because the AI only hears the words, not the tone.
+Most AI systems rely almost exclusively on lexical data. This creates an "Emotional Gap" which is a failure to detect linguistic incongruence. Without the ability to interpret vocal nuance, human subtext is often missed.
 
 ## Our Solution
-MEDS is a smart AI engine that performs Emotion + Meaning Fusion. By combining speech-to-text with advanced audio feature extraction (pitch, energy, and tone), our system can identify "False Fine" situations—where a user's spoken words ("I'm fine") conflict with their actual emotional state.
+Our solution is an Emotion AI interface that analyzes user input to detect emotional tone, identify potential emotional inconsistencies, and provide supportive feedback.
+
+The system uses sentiment analysis logic to classify emotions, assigns a risk score, and visualizes emotional trends over time using an interactive dashboard.
+
+This helps bridge the emotional gap by making AI responses more empathetic and context-aware.
 
 ## Tech Stack (In Progress)
-* **Frontend:** HTML/JS for real-time dashboard visualization.
+* **Frontend:** HTML, CSS, JS for real-time dashboard visualization.
 * **Backend:** Python Flask API for orchestration.
 * **Audio Intelligence:** Whisper (Speech-to-Text) and Librosa (Audio Feature Extraction).
 * **The Brain:** Fine-tuned Oumi Small Language Model (SLM) for local, privacy-first empathetic responses.
