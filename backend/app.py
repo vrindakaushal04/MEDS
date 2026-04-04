@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-# External modules (DO NOT MODIFY)
+from config import OUMI_BASE_URL, USE_LLM
+
 from services import stt, audio_emotion, text_emotion, fusion, response
 
 app = Flask(__name__)
@@ -15,8 +16,19 @@ def root():
         "message": "Emotion AI backend running",
         "routes": {
             "analyze": "POST /analyze",
-            "analyze_text": "POST /analyze-text"
-        }
+            "analyze_text": "POST /analyze-text",
+            "health": "GET /health",
+        },
+    })
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "use_llm": USE_LLM,
+        "oumi_base_url": OUMI_BASE_URL,
+        "brain": "Oumi SLM (OpenAI-compatible); set OUMI_BASE_URL / OUMI_MODEL",
     })
 
 
