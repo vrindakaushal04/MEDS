@@ -1,0 +1,38 @@
+# Fine-tune a small instruct model with Oumi for MEDS empathetic replies.
+# Docs: https://oumi.ai/docs/en/latest/user_guides/train/configuration.html
+# Install: pip install oumi
+# Run: oumi train -c oumi/configs/meds_empathy_sft.yaml
+#
+# Prepare a JSONL dataset with fields the collator expects (see Oumi dataset docs).
+# Example rows: {"messages": [{"role":"user","content":"..."},{"role":"assistant","content":"..."}]}
+
+model:
+  model_name: meta-llama/Llama-3.2-1B-Instruct
+  torch_dtype_str: bfloat16
+  trust_remote_code: true
+  model_max_length: 2048
+
+data:
+  train:
+    datasets:
+      - dataset_name: json
+        dataset_path: oumi/data/meds_train.jsonl
+        split: train
+  collator_name: text_with_padding
+
+training:
+  trainer_type: TRL_SFT
+  output_dir: oumi/outputs/meds-empathy-sft
+  num_train_epochs: 2
+  per_device_train_batch_size: 2
+  learning_rate: 2.0e-5
+  max_steps: -1
+  logging_steps: 10
+  save_steps: 200
+
+peft:
+  q_lora: false
+  lora_r: 16
+  lora_alpha: 32
+  lora_target_modules: all-linear
+  lora_dropout: 0.05
