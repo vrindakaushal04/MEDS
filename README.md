@@ -4,6 +4,23 @@ Bridging the "Emotion Gap" between spoken words and true feelings.
 
 Developed by Team pENTEX for the Eclipse 6.0 SLM Voice Agents Challenge
 
+## The Problem
+Most AI systems rely almost exclusively on lexical data. This creates an "Emotional Gap" which is a failure to detect linguistic incongruence. Without the ability to interpret vocal nuance, human subtext is often missed.
+
+## Our Solution
+Our solution is an Emotion AI interface that analyzes user input to detect emotional tone, identify potential emotional inconsistencies, and provide supportive feedback.
+
+The system uses sentiment analysis logic to classify emotions, assigns a risk score, and visualizes emotional trends over time using an interactive dashboard.
+
+This helps bridge the emotional gap by making AI responses more empathetic and context-aware.
+
+## Tech Stack
+* **Frontend:** HTML, CSS, JS dashboard with live waveform, calmness trend chart, configurable API URL.
+* **Backend:** Python Flask API — STT, librosa audio features, lexical + fusion logic, **Oumi SLM** via OpenAI-compatible HTTP.
+* **The Brain:** Fine-tune with **[Oumi](https://github.com/oumi-ai/oumi)**.
+
+![WhatsApp Image 2026-04-05 at 05 02 29](https://github.com/user-attachments/assets/cb4318b9-de9d-43d9-9e29-fd5825edfaa8)
+
 ---
 
 ## How to run (start here)
@@ -113,20 +130,7 @@ Example training config in this repo: `oumi/configs/meds_empathy_sft.yaml` (adju
 
 ---
 
-## The Problem
-Most AI systems rely almost exclusively on lexical data. This creates an "Emotional Gap" which is a failure to detect linguistic incongruence. Without the ability to interpret vocal nuance, human subtext is often missed.
 
-## Our Solution
-Our solution is an Emotion AI interface that analyzes user input to detect emotional tone, identify potential emotional inconsistencies, and provide supportive feedback.
-
-The system uses sentiment analysis logic to classify emotions, assigns a risk score, and visualizes emotional trends over time using an interactive dashboard.
-
-This helps bridge the emotional gap by making AI responses more empathetic and context-aware.
-
-## Tech Stack
-* **Frontend:** HTML, CSS, JS dashboard with live waveform, calmness trend chart, configurable API URL.
-* **Backend:** Python Flask API — STT, librosa audio features, lexical + fusion logic, **Oumi SLM** via OpenAI-compatible HTTP.
-* **The Brain:** Fine-tune with **[Oumi](https://github.com/oumi-ai/oumi)** (star the repo for the hackathon), then serve the checkpoint behind `/v1/chat/completions`.
 
 ## The Team: pENTEX
 * **Mannat Sharma (Team Leader):** Project Architecture, Pitch & Documentation.
