@@ -99,7 +99,7 @@ const waveCtx = waveCanvas.getContext("2d");
 
 function getApiBase() {
     const raw = (apiBaseInput.value || "").trim().replace(/\/$/, "");
-    return raw || "http://127.0.0.1:5000";
+    return raw || "https://meds-08ez.onrender.com/";
 }
 
 function apiUrl(path) {
@@ -109,7 +109,7 @@ function apiUrl(path) {
 function loadStoredApi() {
     const s = localStorage.getItem(LS_API);
     if (s) apiBaseInput.value = s;
-    else apiBaseInput.value = "http://127.0.0.1:5000";
+    else apiBaseInput.value = "https://meds-08ez.onrender.com/";
 }
 
 function persistApi() {
